@@ -9,10 +9,10 @@ public class Person {
     private String name;
     private List<String> keySkills = new ArrayList<>();
     private List<TableInfo> tableInfo = new ArrayList<>();
-    private List<TableInfo> educationInfo;
+    private List<TableInfo> educationInfo = new ArrayList<>();
     private Map<String, String> languages = new HashMap<>();
-    private String qualifications;
-    private String tests;
+    private List<String> qualifications = new ArrayList<>();
+    private List<String> tests = new ArrayList<>();
 
     public String getName() {
         return name;
@@ -54,19 +54,19 @@ public class Person {
         this.languages = languages;
     }
 
-    public String getQualifications() {
+    public List<String> getQualifications() {
         return qualifications;
     }
 
-    public void setQualifications(String qualifications) {
+    public void setQualifications(List<String> qualifications) {
         this.qualifications = qualifications;
     }
 
-    public String getTests() {
+    public List<String> getTests() {
         return tests;
     }
 
-    public void setTests(String tests) {
+    public void setTests(List<String> tests) {
         this.tests = tests;
     }
 }

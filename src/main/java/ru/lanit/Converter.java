@@ -26,8 +26,8 @@ public class Converter {
     public void convert() {
         Converter converter = new Converter();
         Map<String, String> htmlFiles = converter.generateHTMLFromPDF();
-        Map<String, Person> persons = converter.getPersonFromHtml(htmlFiles);
         try {
+            Map<String, Person> persons = converter.getPersonFromHtml(htmlFiles);
             converter.generateDocx(persons);
         } finally {
             FileUtils.deleteHtmlFiles(htmlFiles);
@@ -41,7 +41,7 @@ public class Converter {
      */
     private Map<String, String> generateHTMLFromPDF() {
         Map<String, String> htmlFiles = new HashMap<>();
-        LOGGER.info("Поиск файлов PDF в текущей директории и конвертация их в HTML");
+        LOGGER.info("Поиск файлов PDF в текущей папке и конвертация их в HTML");
         for (Map.Entry<String, String> filePath: FileUtils.getPdfFiles().entrySet()) {
             Document pdfDocument = new Document(filePath.getValue());
             HtmlSaveOptions htmlOptions = new HtmlSaveOptions(SaveFormat.Html);
@@ -107,10 +107,10 @@ public class Converter {
 
                 //Инфо
                 addLine(document, "Должность в проекте:", true);
-                addLine(document, "Имя:", true);
-                addLine(document, person.getValue().getName(), false);
+                addLine(document, "Имя: ", true);
+                addCurrentLine(document, person.getValue().getName(), false);
                 addLine(document, "Основные показатели квалификации:", true);
-                addLine(document, StringUtils.join(person.getValue().getKeySkills()), false);
+                addLine(document, StringUtils.join(person.getValue().getKeySkills(), ", "), false);
                 addLine(document, "Сведения о трудовой деятельности:", true);
 
                 //Таблица пред. работа
@@ -127,16 +127,15 @@ public class Converter {
                 addLine(document, "Знание языков (отлично, хорошо, удовлетворительно, плохо):", true);
                 addLine(document, String.format("Русский: %s", person.getValue().getLanguages().getOrDefault("Русский", "")), false);
                 addLine(document, String.format("Английский: %s", person.getValue().getLanguages().getOrDefault("Английский", "")), false);
-                addLine(document, "Повышение квалификации и курсы:", true);
 
-                if (person.getValue().getQualifications() != null) {
-                    addLine(document, String.format("\n%s", person.getValue().getQualifications()), false);
+                addLine(document, "Повышение квалификации и курсы:", true);
+                for (String qualification: person.getValue().getQualifications()) {
+                    addLine(document, qualification, false);
                 }
 
                 addLine(document, "Тесты:", true);
-
-                if (person.getValue().getQualifications() != null) {
-                    addLine(document, String.format("\n%s", person.getValue().getTests()), false);
+                for (String test: person.getValue().getTests()) {
+                    addLine(document, test, false);
                 }
 
                 FileOutputStream out;
@@ -167,7 +166,7 @@ public class Converter {
 
         if (boldFont == null || blueFont == null) return result;
 
-        for(int i = 0; i < lines.size(); i++) {
+        for (int i = 0; i < lines.size(); i++) {
             if(lines.get(i).hasClass(blueFont)) {
                 jobIndex.add(i);
                 positionIndex.add(i + 1);
@@ -175,7 +174,7 @@ public class Converter {
             }
         }
 
-        for(Integer i: periodIndex) {
+        for (Integer i: periodIndex) {
             for(int j = i + 1; j < lines.size(); j++) {
                 if(lines.get(j).hasClass(blueFont) || lines.get(j).hasClass(boldFont)) {
                     lastJobIndex.add(j - 1);
@@ -184,16 +183,16 @@ public class Converter {
             }
         }
 
-        for(Integer i: jobIndex) {
+        for (Integer i: jobIndex) {
             title.add(lines.get(i).text());
             position.add(lines.get(i + 1).text());
-            period.add(lines.get(i + 2).text());
+            period.add(lines.get(i + 2).text().replaceAll("\\(.*\\)", ""));
         }
 
-        for(int i = 0; i < periodIndex.size(); i++) {
+        for (int i = 0; i < periodIndex.size(); i++) {
             TableInfo tableInfo = new TableInfo();
             StringBuilder sb = new StringBuilder();
-            for(int j = periodIndex.get(i) + 1; j <= lastJobIndex.get(i); j++) {
+            for (int j = periodIndex.get(i) + 1; j <= lastJobIndex.get(i); j++) {
                 sb.append(lines.get(j).text()).append("\n");
             }
             tableInfo.setName(title.get(i));
@@ -218,9 +217,13 @@ public class Converter {
 
         if (start.isPresent() && end.isPresent()) {
             TableInfo tableInfo = new TableInfo();
-            for(int i = start.getAsInt() + 1; i < end.getAsInt(); i++) {
-                sb.append(lines.get(i).text()).append("\n");
-                tableInfo.setName(sb.toString());
+            for(int i = start.getAsInt() + 2; i < end.getAsInt(); i++) {
+                if (lines.get(i).text().matches("^\\d+$")) {
+                    tableInfo.setPeriod(lines.get(i).text());
+                } else {
+                    sb.append(lines.get(i).text()).append("\n");
+                    tableInfo.setName(sb.toString());
+                }
             }
             result.add(tableInfo);
         }
@@ -257,8 +260,8 @@ public class Converter {
         return result;
     }
 
-    private String getSubText(Elements lines, String text) {
-        StringBuilder sb = new StringBuilder();
+    private List<String> getSubText(Elements lines, String text) {
+        List<String> result = new ArrayList<>();
         String boldFont = getClassValue(lines, text, 0);
         Integer end = null;
         OptionalInt start = IntStream.range(0, lines.size())
@@ -276,11 +279,11 @@ public class Converter {
 
         if (start.isPresent() && end != null) {
             for(int i = start.getAsInt() + 1; i < end; i++) {
-                sb.append(lines.get(i).text()).append("\n");
+                result.add(lines.get(i).text());
             }
         }
 
-        return sb.toString();
+        return result;
     }
 
     private List<String> getKeySkills(Elements lines) {
@@ -312,11 +315,21 @@ public class Converter {
         run.setFontFamily(FONT_FAMILY);
     }
 
+    private void addCurrentLine(XWPFDocument document, String text, boolean isBold) {
+        XWPFParagraph paragraph = document.getLastParagraph();
+        paragraph.setSpacingBetween(1.5);
+        XWPFRun run = paragraph.createRun();
+        run.setText(text);
+        run.setFontSize(11);
+        run.setBold(isBold);
+        run.setFontFamily(FONT_FAMILY);
+    }
+
     private void addTable(XWPFDocument document, String[] titles, List<TableInfo> tableInfo) {
         XWPFTable table = document.createTable();
 
         XWPFTableRow row = table.getRow(0);
-        XWPFRun run = row.getCell(0).addParagraph().createRun();
+        XWPFRun run = row.getCell(0).getParagraphArray(0).createRun();
         run.setBold(true);
         run.setText(titles[0]);
 
