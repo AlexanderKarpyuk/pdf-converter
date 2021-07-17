@@ -95,59 +95,60 @@ public class Converter {
             XWPFDocument document = new XWPFDocument();
             String newLine = "\n";
             LOGGER.info("Генерация документа DOCX из файла '{}'", person.getKey());
-
-            //Заголовок
-            XWPFParagraph paragraphTitle = document.createParagraph();
-            paragraphTitle.setSpacingBetween(1.5);
-            XWPFRun runTitle = paragraphTitle.createRun();
-            runTitle.setText("Резюме");
-            runTitle.setFontFamily(FONT_FAMILY);
-            runTitle.setFontSize(14);
-            paragraphTitle.setAlignment(ParagraphAlignment.CENTER);
-
-            //Инфо
-            addLine(document, "Должность в проекте:", true);
-            addLine(document, "Имя:", true);
-            addLine(document, person.getValue().getName(), false);
-            addLine(document, "Основные показатели квалификации:", true);
-            addLine(document, StringUtils.join(person.getValue().getKeySkills()), false);
-            addLine(document, "Сведения о трудовой деятельности:", true);
-
-            //Таблица пред. работа
-            String[] titlesJob = new String[]{"Период", "Место работы / должность", "Характер работ, проекты, в которых участвовал"};
-            addTable(document, titlesJob, person.getValue().getJobInfo());
-
-            //Таблица образование
-            addLine(document, newLine, true);
-            addLine(document, "Образование:", true);
-            String[] titlesEducation = new String[]{"Период", "Название учебного заведения", "Присвоенная степень/звание/сертификат"};
-            addTable(document, titlesEducation, person.getValue().getEducationInfo());
-
-            //Доп. инфо
-            addLine(document, "Знание языков (отлично, хорошо, удовлетворительно, плохо):", true);
-            addLine(document, String.format("Русский: %s", person.getValue().getLanguages().getOrDefault("Русский", "")), false);
-            addLine(document, String.format("Английский: %s", person.getValue().getLanguages().getOrDefault("Английский", "")), false);
-            addLine(document, "Повышение квалификации и курсы:", true);
-
-            if (person.getValue().getQualifications() != null) {
-                addLine(document, String.format("\n%s", person.getValue().getQualifications()), false);
-            }
-
-            addLine(document, "Тесты:", true);
-
-            if (person.getValue().getQualifications() != null) {
-                addLine(document, String.format("\n%s", person.getValue().getTests()), false);
-            }
-
-            FileOutputStream out;
             try {
+                //Заголовок
+                XWPFParagraph paragraphTitle = document.createParagraph();
+                paragraphTitle.setSpacingBetween(1.5);
+                XWPFRun runTitle = paragraphTitle.createRun();
+                runTitle.setText("Резюме");
+                runTitle.setFontFamily(FONT_FAMILY);
+                runTitle.setFontSize(14);
+                paragraphTitle.setAlignment(ParagraphAlignment.CENTER);
+
+                //Инфо
+                addLine(document, "Должность в проекте:", true);
+                addLine(document, "Имя:", true);
+                addLine(document, person.getValue().getName(), false);
+                addLine(document, "Основные показатели квалификации:", true);
+                addLine(document, StringUtils.join(person.getValue().getKeySkills()), false);
+                addLine(document, "Сведения о трудовой деятельности:", true);
+
+                //Таблица пред. работа
+                String[] titlesJob = new String[]{"Период", "Место работы / должность", "Характер работ, проекты, в которых участвовал"};
+                addTable(document, titlesJob, person.getValue().getJobInfo());
+
+                //Таблица образование
+                addLine(document, newLine, true);
+                addLine(document, "Образование:", true);
+                String[] titlesEducation = new String[]{"Период", "Название учебного заведения", "Присвоенная степень/звание/сертификат"};
+                addTable(document, titlesEducation, person.getValue().getEducationInfo());
+
+                //Доп. инфо
+                addLine(document, "Знание языков (отлично, хорошо, удовлетворительно, плохо):", true);
+                addLine(document, String.format("Русский: %s", person.getValue().getLanguages().getOrDefault("Русский", "")), false);
+                addLine(document, String.format("Английский: %s", person.getValue().getLanguages().getOrDefault("Английский", "")), false);
+                addLine(document, "Повышение квалификации и курсы:", true);
+
+                if (person.getValue().getQualifications() != null) {
+                    addLine(document, String.format("\n%s", person.getValue().getQualifications()), false);
+                }
+
+                addLine(document, "Тесты:", true);
+
+                if (person.getValue().getQualifications() != null) {
+                    addLine(document, String.format("\n%s", person.getValue().getTests()), false);
+                }
+
+                FileOutputStream out;
+
                 out = new FileOutputStream(new File(String.format("%s\\%s.docx", FileUtils.getPath(), person.getKey())));
                 document.write(out);
                 out.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+
+                LOGGER.info("DOCX документ для файла '{}' создан", person.getKey());
+            } catch (Exception ex) {
+                LOGGER.error("Для файла '{}' не удалось создать DOCX документ", person.getKey());
             }
-            LOGGER.info("DOCX документ для файла '{}' создан", person.getKey());
         }
     }
 
