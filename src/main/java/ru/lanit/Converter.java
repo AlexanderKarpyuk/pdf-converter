@@ -27,8 +27,12 @@ public class Converter {
         Converter converter = new Converter();
         Map<String, String> htmlFiles = converter.generateHTMLFromPDF();
         Map<String, Person> persons = converter.getPersonFromHtml(htmlFiles);
-        converter.generateDocx(persons);
-        FileUtils.deleteHtmlFiles(htmlFiles);
+        try {
+            converter.generateDocx(persons);
+        } finally {
+            FileUtils.deleteHtmlFiles(htmlFiles);
+            FileUtils.deleteTempDirectories(htmlFiles);
+        }
     }
 
     /**
@@ -37,7 +41,7 @@ public class Converter {
      */
     private Map<String, String> generateHTMLFromPDF() {
         Map<String, String> htmlFiles = new HashMap<>();
-        LOGGER.info("Поиск файлов PDF в текущей директории и конвертации их в HTML");
+        LOGGER.info("Поиск файлов PDF в текущей директории и конвертация их в HTML");
         for (Map.Entry<String, String> filePath: FileUtils.getPdfFiles().entrySet()) {
             Document pdfDocument = new Document(filePath.getValue());
             HtmlSaveOptions htmlOptions = new HtmlSaveOptions(SaveFormat.Html);
@@ -159,6 +163,8 @@ public class Converter {
         List<TableInfo> result = new ArrayList<>();
         String blueFont = getClassValue(lines, "ПРОФЕССИОНАЛЬНЫЙ ОПЫТ", 1);
         String boldFont = getClassValue(lines, "ПРОФЕССИОНАЛЬНЫЙ ОПЫТ", 2);
+
+        if (boldFont == null || blueFont == null) return result;
 
         for(int i = 0; i < lines.size(); i++) {
             if(lines.get(i).hasClass(blueFont)) {
@@ -321,21 +327,21 @@ public class Converter {
         run.setBold(true);
         run.setText(titles[2]);
 
-        for (int i = 0; i < tableInfo.size(); i++) {
+        for (TableInfo info : tableInfo) {
             XWPFTableRow subRow = table.createRow();
             run = subRow.getCell(0).addParagraph().createRun();
             run.setFontSize(9);
-            if (tableInfo.get(i).getPeriod() != null) {
-                run.setText(tableInfo.get(i).getPeriod());
+            if (info.getPeriod() != null) {
+                run.setText(info.getPeriod());
             }
 
             run = subRow.addNewTableCell().addParagraph().createRun();
             run.setFontSize(9);
-            if (tableInfo.get(i).getName() != null && tableInfo.get(i).getPosition() != null) {
-                run.setText(String.format("%s/%s", tableInfo.get(i).getName(),
-                        tableInfo.get(i).getPosition()));
-            } else if (tableInfo.get(i).getName() != null && tableInfo.get(i).getPosition() == null) {
-                run.setText(tableInfo.get(i).getName());
+            if (info.getName() != null && info.getPosition() != null) {
+                run.setText(String.format("%s/%s", info.getName(),
+                        info.getPosition()));
+            } else if (info.getName() != null && info.getPosition() == null) {
+                run.setText(info.getName());
             }
 
             run = subRow.addNewTableCell().addParagraph().createRun();
