@@ -1,4 +1,4 @@
-package ru.lanit;
+package ru.lanit.models;
 
 import java.util.ArrayList;
 import java.util.HashMap;

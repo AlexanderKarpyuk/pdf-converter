@@ -1,4 +1,4 @@
-package ru.lanit;
+package ru.lanit.models;
 
 public class TableInfo {
     private String name;

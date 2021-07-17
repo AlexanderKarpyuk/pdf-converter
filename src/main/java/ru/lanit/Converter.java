@@ -2,115 +2,149 @@ package ru.lanit;
 
 import com.aspose.pdf.*;
 import com.aspose.pdf.Document;
-import com.aspose.pdf.devices.TextDevice;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import ru.lanit.models.Person;
+import ru.lanit.models.TableInfo;
 
 import java.io.*;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 
 public class Converter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Converter.class);
     private final String FONT_FAMILY = "Times New Roman";
 
     public void convert() {
         Converter converter = new Converter();
-        converter.generateHTMLFromPDF();
-        try {
-            Person person = converter.getPersonFromHtml();
-            converter.generateDocx(person);
-        } catch (IOException e) {
-            e.printStackTrace();
+        Map<String, String> htmlFiles = converter.generateHTMLFromPDF();
+        Map<String, Person> persons = converter.getPersonFromHtml(htmlFiles);
+        converter.generateDocx(persons);
+        FileUtils.deleteHtmlFiles(htmlFiles);
+    }
+
+    /**
+     * Конвертирует pdf в html формат
+     * @return - ключ - имя файла, value - абсолютный путь до файла
+     */
+    private Map<String, String> generateHTMLFromPDF() {
+        Map<String, String> htmlFiles = new HashMap<>();
+        LOGGER.info("Поиск файлов PDF в текущей директории и конвертации их в HTML");
+        for (Map.Entry<String, String> filePath: FileUtils.getPdfFiles().entrySet()) {
+            Document pdfDocument = new Document(filePath.getValue());
+            HtmlSaveOptions htmlOptions = new HtmlSaveOptions(SaveFormat.Html);
+            String newAbsolutePath = String.format("%s\\%s.html", FileUtils.getPath(), filePath.getKey());
+            pdfDocument.save(newAbsolutePath, htmlOptions);
+            htmlFiles.put(filePath.getKey(), newAbsolutePath);
+            LOGGER.info("Файл '{}' конвертирован в HTML", filePath.getKey());
         }
+        return htmlFiles;
     }
 
-    private void generateHTMLFromPDF() {
-        Document pdfDocument = new Document(getPath() + "\\file.pdf");
-        HtmlSaveOptions htmlOptions = new HtmlSaveOptions(SaveFormat.Html);
-        pdfDocument.save(getPath() + "\\file.html", htmlOptions);
-    }
+    /**
+     * Конвертация HTML фалов в объекты Person
+     * @param htmlFiles - Map полученный из метода generateHTMLFromPDF()
+     * @return - ключ - имя файла, value - объект Person
+     */
+    private Map<String, Person> getPersonFromHtml(Map<String, String> htmlFiles) {
+        Map<String, Person> persons = new HashMap<>();
+        LOGGER.info("Генерация сущностей Person из HTML файлов");
+        for (Map.Entry<String, String> file: htmlFiles.entrySet()) {
+            LOGGER.info("Создание сущности для файла: " + file.getKey());
+            Person person = new Person();
+            String html = FileUtils.getHtml(file.getValue());
+            org.jsoup.nodes.Document doc = Jsoup.parse(html);
+            Elements lines = doc.select("span");
+            lines.removeIf(s -> s.text().contains("Evaluation Only. Created with Aspose.PDF. Copyright 2002-2019 Aspose Pty Ltd"));
+            lines.removeIf(s -> s.text().isEmpty());
 
-    private Person getPersonFromHtml() throws IOException {
-        Person person = new Person();
-        List<String[]> jobInfo = new ArrayList<>();
+            person.setName(lines.get(0).text());
+            person.setJobInfo(getJobInfo(lines));
+            person.setKeySkills(getKeySkills(lines));
+            person.setEducationInfo(getEducationInfo(lines));
+            person.setLanguages(getLanguages(lines));
+            person.setQualifications(getSubText(lines, "Повышение квалификации и курсы"));
+            person.setTests(getSubText(lines, "Тесты"));
 
-        String html = getHtml(getPath() + "\\file.html");
-        org.jsoup.nodes.Document doc = Jsoup.parse(html);
-        Elements lines = doc.select("span");
-        lines.removeIf(s -> s.text().contains("Evaluation Only. Created with Aspose.PDF. Copyright 2002-2019 Aspose Pty Ltd"));
-        lines.removeIf(s -> s.text().isEmpty());
-
-        person.setName(lines.get(0).text());
-        person.setJobInfo(getJobInfo(lines));
-        person.setKeySkills(getKeySkills(lines));
-        person.setEducationInfo(getEducationInfo(lines));
-        person.setLanguages(getLanguages(lines));
-        person.setQualifications(getSubText(lines, "Повышение квалификации и курсы"));
-        person.setTests(getSubText(lines, "Тесты"));
-
-        return person;
-    }
-
-    private void generateDocx(Person person) {
-        XWPFDocument document = new XWPFDocument();
-        String newLine = "\n";
-
-        //Заголовок
-        XWPFParagraph paragraphTitle = document.createParagraph();
-        paragraphTitle.setSpacingBetween(1.5);
-        XWPFRun runTitle = paragraphTitle.createRun();
-        runTitle.setText("Резюме");
-        runTitle.setFontFamily(FONT_FAMILY);
-        runTitle.setFontSize(14);
-        paragraphTitle.setAlignment(ParagraphAlignment.CENTER);
-
-        //Инфо
-        addLine(document, "Должность в проекте:", true);
-        addLine(document, "Имя:", true);
-        addLine(document, person.getName(), false);
-        addLine(document, "Основные показатели квалификации:", true);
-        addLine(document, StringUtils.join(person.getKeySkills()), false);
-        addLine(document, "Сведения о трудовой деятельности:", true);
-
-        //Таблица пред. работа
-        String[] titlesJob = new String[]{"Период", "Место работы / должность", "Характер работ, проекты, в которых участвовал"};
-        addTable(document, titlesJob, person.getJobInfo());
-
-        //Таблица образование
-        addLine(document, newLine, true);
-        addLine(document, "Образование:", true);
-        String[] titlesEducation = new String[]{"Период", "Название учебного заведения", "Присвоенная степень/звание/сертификат"};
-        addTable(document, titlesEducation, person.getEducationInfo());
-
-        //Доп. инфо
-        addLine(document, "Знание языков (отлично, хорошо, удовлетворительно, плохо):", true);
-        addLine(document, String.format("Русский: %s", person.getLanguages().getOrDefault("Русский", "")), false);
-        addLine(document, String.format("Английский: %s", person.getLanguages().getOrDefault("Английский", "")), false);
-        addLine(document, "Повышение квалификации и курсы:", true);
-        if (person.getQualifications() != null) addLine(document, String.format("\n%s", person.getQualifications()), false);
-        addLine(document, "Тесты:", true);
-        if (person.getQualifications() != null) addLine(document, String.format("\n%s", person.getTests()), false);
-
-        FileOutputStream out;
-        try {
-            out = new FileOutputStream( new File(getPath() + "\\file.docx"));
-            document.write(out);
-            out.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+            persons.put(file.getKey(), person);
+            LOGGER.info(String.format("Для файла '%s' создана сущность Person", file.getKey()));
         }
 
-        System.out.println("file.docx written successully");
+        return persons;
+    }
+
+    /**
+     * Генерирует DOCX документы из объектов Person
+     * @param persons - Map полученный из метода getPersonFromHtml()
+     */
+    private void generateDocx(Map<String, Person> persons) {
+        LOGGER.info("Генерация DOCX файлов");
+        for (Map.Entry<String, Person> person: persons.entrySet()) {
+            XWPFDocument document = new XWPFDocument();
+            String newLine = "\n";
+            LOGGER.info("Генерация документа DOCX из файла '{}'", person.getKey());
+
+            //Заголовок
+            XWPFParagraph paragraphTitle = document.createParagraph();
+            paragraphTitle.setSpacingBetween(1.5);
+            XWPFRun runTitle = paragraphTitle.createRun();
+            runTitle.setText("Резюме");
+            runTitle.setFontFamily(FONT_FAMILY);
+            runTitle.setFontSize(14);
+            paragraphTitle.setAlignment(ParagraphAlignment.CENTER);
+
+            //Инфо
+            addLine(document, "Должность в проекте:", true);
+            addLine(document, "Имя:", true);
+            addLine(document, person.getValue().getName(), false);
+            addLine(document, "Основные показатели квалификации:", true);
+            addLine(document, StringUtils.join(person.getValue().getKeySkills()), false);
+            addLine(document, "Сведения о трудовой деятельности:", true);
+
+            //Таблица пред. работа
+            String[] titlesJob = new String[]{"Период", "Место работы / должность", "Характер работ, проекты, в которых участвовал"};
+            addTable(document, titlesJob, person.getValue().getJobInfo());
+
+            //Таблица образование
+            addLine(document, newLine, true);
+            addLine(document, "Образование:", true);
+            String[] titlesEducation = new String[]{"Период", "Название учебного заведения", "Присвоенная степень/звание/сертификат"};
+            addTable(document, titlesEducation, person.getValue().getEducationInfo());
+
+            //Доп. инфо
+            addLine(document, "Знание языков (отлично, хорошо, удовлетворительно, плохо):", true);
+            addLine(document, String.format("Русский: %s", person.getValue().getLanguages().getOrDefault("Русский", "")), false);
+            addLine(document, String.format("Английский: %s", person.getValue().getLanguages().getOrDefault("Английский", "")), false);
+            addLine(document, "Повышение квалификации и курсы:", true);
+
+            if (person.getValue().getQualifications() != null) {
+                addLine(document, String.format("\n%s", person.getValue().getQualifications()), false);
+            }
+
+            addLine(document, "Тесты:", true);
+
+            if (person.getValue().getQualifications() != null) {
+                addLine(document, String.format("\n%s", person.getValue().getTests()), false);
+            }
+
+            FileOutputStream out;
+            try {
+                out = new FileOutputStream(new File(String.format("%s\\%s.docx", FileUtils.getPath(), person.getKey())));
+                document.write(out);
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            LOGGER.info("DOCX документ для файла '{}' создан", person.getKey());
+        }
     }
 
     private List<TableInfo> getJobInfo(Elements lines) {
@@ -307,39 +341,5 @@ public class Converter {
             run = subRow.addNewTableCell().addParagraph().createRun();
             run.setFontSize(9);
         }
-    }
-
-    private static String getHtml(String path) {
-        String html = null;
-        int count = 0;
-
-        while (count < 5) {
-            try {
-                html = IOUtils.toString(new InputStreamReader(new FileInputStream(getPath() + "\\file.html"),
-                        StandardCharsets.UTF_8));
-                count = 5;
-            } catch (IOException e) {
-                try {
-                    count += 1;
-                    Thread.sleep(1000);
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-            }
-        }
-        return html;
-    }
-
-    private static String getPath() {
-        String path = null;
-        try {
-            path = new File(Converter.class.getProtectionDomain().getCodeSource().getLocation()
-                    .toURI()).getPath();
-            path = path.substring(0, path.lastIndexOf("\\"));
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-
-        return path;
     }
 }
