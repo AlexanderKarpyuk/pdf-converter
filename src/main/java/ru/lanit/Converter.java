@@ -331,25 +331,33 @@ public class Converter {
         XWPFTableRow row = table.getRow(0);
         XWPFRun run = row.getCell(0).getParagraphArray(0).createRun();
         run.setBold(true);
+        run.setFontFamily(FONT_FAMILY);
+        run.setFontSize(11);
         run.setText(titles[0]);
 
         run = row.addNewTableCell().addParagraph().createRun();
         run.setBold(true);
+        run.setFontFamily(FONT_FAMILY);
+        run.setFontSize(11);
         run.setText(titles[1]);
 
         run = row.addNewTableCell().addParagraph().createRun();
         run.setBold(true);
+        run.setFontFamily(FONT_FAMILY);
+        run.setFontSize(11);
         run.setText(titles[2]);
 
         for (TableInfo info : tableInfo) {
             XWPFTableRow subRow = table.createRow();
             run = subRow.getCell(0).addParagraph().createRun();
+            run.setFontFamily(FONT_FAMILY);
             run.setFontSize(9);
             if (info.getPeriod() != null) {
                 run.setText(info.getPeriod());
             }
 
             run = subRow.addNewTableCell().addParagraph().createRun();
+            run.setFontFamily(FONT_FAMILY);
             run.setFontSize(9);
             if (info.getName() != null && info.getPosition() != null) {
                 run.setText(String.format("%s/%s", info.getName(),
@@ -359,6 +367,7 @@ public class Converter {
             }
 
             run = subRow.addNewTableCell().addParagraph().createRun();
+            run.setFontFamily(FONT_FAMILY);
             run.setFontSize(9);
         }
     }
