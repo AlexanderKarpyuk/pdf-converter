@@ -7,12 +7,17 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblLayoutType;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblWidth;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblLayoutType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.lanit.models.Person;
 import ru.lanit.models.TableInfo;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -143,6 +148,7 @@ public class Converter {
                 out = new FileOutputStream(new File(String.format("%s\\%s.docx", FileUtils.getPath(), person.getKey())));
                 document.write(out);
                 out.close();
+                document.close();
 
                 LOGGER.info("DOCX документ для файла '{}' создан", person.getKey());
             } catch (Exception ex) {
@@ -328,6 +334,9 @@ public class Converter {
     private void addTable(XWPFDocument document, String[] titles, List<TableInfo> tableInfo) {
         XWPFTable table = document.createTable();
 
+        CTTblLayoutType type = table.getCTTbl().getTblPr().addNewTblLayout();
+        type.setType(STTblLayoutType.FIXED);
+
         XWPFTableRow row = table.getRow(0);
         XWPFRun run = row.getCell(0).getParagraphArray(0).createRun();
         run.setBold(true);
@@ -335,40 +344,52 @@ public class Converter {
         run.setFontSize(11);
         run.setText(titles[0]);
 
-        run = row.addNewTableCell().addParagraph().createRun();
-        run.setBold(true);
-        run.setFontFamily(FONT_FAMILY);
-        run.setFontSize(11);
-        run.setText(titles[1]);
+        XWPFRun run2 = row.addNewTableCell().addParagraph().createRun();
+        run2.setBold(true);
+        run2.setFontFamily(FONT_FAMILY);
+        run2.setFontSize(11);
+        run2.setText(titles[1]);
 
-        run = row.addNewTableCell().addParagraph().createRun();
-        run.setBold(true);
-        run.setFontFamily(FONT_FAMILY);
-        run.setFontSize(11);
-        run.setText(titles[2]);
+        XWPFRun run3 = row.addNewTableCell().addParagraph().createRun();
+        run3.setBold(true);
+        run3.setFontFamily(FONT_FAMILY);
+        run3.setFontSize(11);
+        run3.setText(titles[2]);
 
         for (TableInfo info : tableInfo) {
             XWPFTableRow subRow = table.createRow();
-            run = subRow.getCell(0).addParagraph().createRun();
-            run.setFontFamily(FONT_FAMILY);
-            run.setFontSize(9);
+            XWPFRun run4 = subRow.getCell(0).addParagraph().createRun();
+            run4.setFontFamily(FONT_FAMILY);
+            run4.setFontSize(9);
             if (info.getPeriod() != null) {
-                run.setText(info.getPeriod());
+                run4.setText(info.getPeriod());
             }
 
-            run = subRow.addNewTableCell().addParagraph().createRun();
-            run.setFontFamily(FONT_FAMILY);
-            run.setFontSize(9);
+            XWPFRun run5 = subRow.getCell(1).addParagraph().createRun();
+            run5.setFontFamily(FONT_FAMILY);
+            run5.setFontSize(9);
             if (info.getName() != null && info.getPosition() != null) {
-                run.setText(String.format("%s/%s", info.getName(),
+                run5.setText(String.format("%s/%s", info.getName(),
                         info.getPosition()));
             } else if (info.getName() != null && info.getPosition() == null) {
-                run.setText(info.getName());
+                run5.setText(info.getName());
             }
 
-            run = subRow.addNewTableCell().addParagraph().createRun();
-            run.setFontFamily(FONT_FAMILY);
-            run.setFontSize(9);
+            XWPFRun run6 = subRow.getCell(2).addParagraph().createRun();
+            run6.setFontFamily(FONT_FAMILY);
+            run6.setFontSize(9);
+        }
+
+        for (int i = 0; i < table.getNumberOfRows(); i++) {
+            XWPFTableRow rowTable = table.getRow(i);
+            int numCells = rowTable.getTableCells().size();
+            for (int j = 0; j < numCells; j++) {
+                XWPFTableCell cell = rowTable.getCell(j);
+                CTTblWidth cellWidth = cell.getCTTc().addNewTcPr().addNewTcW();
+                CTTcPr pr = cell.getCTTc().addNewTcPr();
+                pr.addNewNoWrap();
+                cellWidth.setW(BigInteger.valueOf(2880));
+            }
         }
     }
 }
