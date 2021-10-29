@@ -169,6 +169,7 @@ public class Converter {
         List<TableInfo> result = new ArrayList<>();
         String blueFont = getClassValue(lines, "ПРОФЕССИОНАЛЬНЫЙ ОПЫТ", 1);
         String boldFont = getClassValue(lines, "ПРОФЕССИОНАЛЬНЫЙ ОПЫТ", 2);
+        System.out.println("hello");
 
         if (boldFont == null || blueFont == null) return result;
 
